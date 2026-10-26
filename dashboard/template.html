@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Are we tracking above or below last year?</title>
+<style>
+:root{--bg:#fff;--fg:#1d2733;--mut:#5f6b7a;--card:#f4f6f8;--line:#d9dee4;--cur:#1f6fb5;--prev:#8c9aa5;--up:#1e8e5a;--down:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171d;--fg:#e8ecf0;--mut:#9aa6b3;--card:#1b222b;--line:#2d3744;--cur:#5aa9ee;--prev:#7b8996;--up:#3fc588;--down:#ef6a5b}}
+:root[data-theme="dark"]{--bg:#12171d;--fg:#e8ecf0;--mut:#9aa6b3;--card:#1b222b;--line:#2d3744;--cur:#5aa9ee;--prev:#7b8996;--up:#3fc588;--down:#ef6a5b}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:18px 16px 28px}
+h1{font-size:1.35rem;margin:0 0 4px}.sub{color:var(--mut);margin:0 0 14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+label{display:flex;flex-direction:column;font-size:.75rem;color:var(--mut);gap:3px}
+select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:140px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border-radius:12px;padding:12px 14px}
+.k{font-size:.78rem;color:var(--mut)}.v{font-size:1.7rem;font-weight:650}
+.d{font-size:.85rem;font-weight:600}.note{font-size:.76rem;color:var(--mut);font-weight:400}
+h2{font-size:.95rem;margin:0 0 2px}.cap{font-size:.78rem;color:var(--mut);margin:0 0 6px}
+svg{width:100%;height:auto;display:block}svg text{fill:var(--mut);font-size:11px}
+.legend{font-size:.78rem;color:var(--mut)}.legend b{display:inline-block;width:18px;height:3px;vertical-align:middle;margin:0 4px 2px 8px}
+footer{margin-top:14px;font-size:.74rem;color:var(--mut)}
+</style></head><body><main>
+<h1>Are we tracking above or below last year, and which channel and category is driving it?</h1>
+<p class="sub">Use this before the weekly staffing and stock call. Compares the selected period with the same weeks one year earlier (364 days back).</p>
+<div class="bar">
+<label>Period (ending <span id="end"></span>)<select id="per"><option value="28">Last 4 weeks</option><option value="91" selected>Last 13 weeks</option><option value="364">Last 52 weeks</option></select></label>
+<label>Channel<select id="loc"><option value="-1">All channels</option></select></label>
+<label>Category<select id="cat"><option value="-1">All categories</option></select></label></div>
+<div class="kpis"><div class="card" id="k1"></div><div class="card" id="k2"></div></div>
+<div class="card" style="margin-bottom:10px"><h2>Transactions per day, week by week</h2>
+<p class="cap legend"><b style="background:var(--cur)"></b>This period<b style="background:var(--prev)"></b>Same weeks last year</p><div id="c1"></div></div>
+<div class="card"><h2>Which categories are moving? (change in transactions vs last year)</h2>
+<p class="cap">Respects the period and channel filters. Coloured bars are changes larger than normal variation; grey bars are likely noise.</p><div id="c2"></div></div>
+<footer>Source: retail_store_sales.csv (Kaggle), 2022-01-01 to <span id="end2"></span>. Transactions use all raw rows; revenue uses cleaned rows and omits ~5% of transactions with unrecoverable amounts. Revenue is pre-discount. The data looks synthetic. “Normal variation” = difference in daily means under 2 standard errors.</footer>
+</main><script>
+const D=__DATA__,T=D.days,NL=2,NC=D.cat.length,S=new Date(D.start+"T00:00:00Z");
+const $=i=>document.getElementById(i),fmtD=d=>new Date(S.getTime()+d*864e5).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"2-digit",timeZone:"UTC"});
+$("end").textContent=$("end2").textContent=fmtD(T-1);
+D.loc.forEach((x,i)=>$("loc").add(new Option(x,i)));D.cat.forEach((x,i)=>$("cat").add(new Option(x,i)));
+function series(a,d0,d1,l,c){const o=[];for(let d=d0;d<d1;d++){let s=0;for(let i=l<0?0:l;i<(l<0?NL:l+1);i++)for(let j=c<0?0:c;j<(c<0?NC:c+1);j++)s+=a[(d*NL+i)*NC+j];o.push(s)}return o}
+const sum=x=>x.reduce((p,q)=>p+q,0),mean=x=>sum(x)/x.length,vr=x=>{const m=mean(x);return sum(x.map(v=>(v-m)**2))/(x.length-1)};
+function cmp(a,b){const m1=mean(a),m2=mean(b),se=Math.sqrt(vr(a)/a.length+vr(b)/b.length);return{m1,m2,pct:m2?m1/m2-1:0,sig:se>0&&Math.abs(m1-m2)/se>=2}}
+const pct=p=>(p>=0?"+":"")+(p*100).toFixed(1)+"%";
+function kpi(el,name,fmt,s){const c=cmp(s.cur,s.prev),col=!c.sig?"var(--mut)":c.pct>0?"var(--up)":"var(--down)";
+$(el).innerHTML=`<div class="k">${name}</div><div class="v">${fmt(c.m1)}</div><div class="d" style="color:${col}">${pct(c.pct)} vs last year <span class="note">(${fmt(c.m2)}) · ${c.sig?"larger than normal variation":"within normal variation"}</span></div>`}
+function line(cur,prev){const W=900,H=250,p={l:42,r:10,t:10,b:26},n=cur.length,mx=Math.max(...cur,...prev)*1.1,mn=Math.min(...cur,...prev)*.9,
+X=i=>p.l+(n>1?i/(n-1):.5)*(W-p.l-p.r),Y=v=>p.t+(1-(v-mn)/(mx-mn||1))*(H-p.t-p.b),P=a=>a.map((v,i)=>`${X(i)},${Y(v)}`).join(" ");let g="";
+for(let k=0;k<=4;k++){const v=mn+(mx-mn)*k/4;g+=`<line x1="${p.l}" x2="${W-p.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${p.l-6}" y="${Y(v)+4}" text-anchor="end">${v.toFixed(1)}</text>`}
+const per=+$("per").value,step=Math.max(1,Math.round(n/6));for(let i=0;i<n;i+=step)g+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${fmtD(T-per+i*7)}</text>`;
+return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly transactions per day, this period versus last year">${g}<polyline points="${P(prev)}" fill="none" stroke="var(--prev)" stroke-width="2" stroke-dasharray="5 4"/><polyline points="${P(cur)}" fill="none" stroke="var(--cur)" stroke-width="2.5"/></svg>`}
+function bars(rows,sel){const W=900,rh=30,H=rows.length*rh+8,mid=470,sc=380/Math.max(.1,...rows.map(r=>Math.abs(r.pct)));let g=`<line x1="${mid}" x2="${mid}" y1="0" y2="${H}" stroke="var(--line)"/>`;
+rows.forEach((r,i)=>{const y=i*rh+4,w=Math.abs(r.pct)*sc,col=!r.sig?"var(--prev)":r.pct>0?"var(--up)":"var(--down)";
+g+=`<text x="${mid-190}" y="${y+16}" text-anchor="end" style="${r.i==sel?"font-weight:700;fill:var(--fg)":""}">${D.cat[r.i]}</text><rect x="${r.pct>=0?mid:mid-w}" y="${y+3}" width="${w}" height="18" rx="3" fill="${col}"/><text x="${r.pct>=0?mid+w+6:mid-w-6}" y="${y+16}" text-anchor="${r.pct>=0?"start":"end"}">${pct(r.pct)}</text>`});
+return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Change in transactions by category versus last year">${g}</svg>`}
+function render(){const N=+$("per").value,l=+$("loc").value,c=+$("cat").value,a=T-N,b=T-N-364;
+const g=(arr,cc)=>({cur:series(arr,a,T,l,cc),prev:series(arr,b,b+N,l,cc)});
+kpi("k1","Transactions per day",v=>v.toFixed(1),g(D.n,c));kpi("k2","Revenue per day (cleaned rows)",v=>Math.round(v).toLocaleString("en-US"),g(D.r,c));
+const s=g(D.n,c),wk=x=>{const o=[];for(let i=0;i+7<=x.length;i+=7)o.push(mean(x.slice(i,i+7)));return o};$("c1").innerHTML=line(wk(s.cur),wk(s.prev));
+const rows=D.cat.map((_,i)=>{const q=g(D.n,i),x=sum(q.cur),y=sum(q.prev);return{i,pct:y?x/y-1:0,sig:Math.abs(x-y)/Math.sqrt(x+y||1)>=2}}).sort((p,q)=>q.pct-p.pct);$("c2").innerHTML=bars(rows,c)}
+["per","loc","cat"].forEach(i=>$(i).addEventListener("change",render));render();
+</script></body></html>
