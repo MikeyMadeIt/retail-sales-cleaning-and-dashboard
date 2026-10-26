@@ -26,11 +26,6 @@ deterministic: two runs produce byte-identical clean CSVs.
 | `output/rejected_rows.csv` | Every dropped row, with the step that dropped it |
 | `reports/data_quality_report.md` | Generated data quality report |
 
-## Provenance
-
-Source: Kaggle (add the dataset URL, author and licence here, and the date you downloaded it).
-The file is included as `data/raw/retail_store_sales.csv`.
-
 ## Exploratory analysis (task 2)
 
 | Path | Purpose |
@@ -48,4 +43,3 @@ Question: *Are we tracking above or below last year, and which channel and categ
 
 - Source: `dashboard/template.html` + `dashboard/build.py` (`python dashboard/build.py` regenerates `dashboard/index.html`).
 - Published copy for GitHub Pages: `docs/index.html` (copy `dashboard/index.html` there after rebuilding).
-- Live URL: `https://<your-username>.github.io/<repo-name>/` (add it here once Pages is enabled).
